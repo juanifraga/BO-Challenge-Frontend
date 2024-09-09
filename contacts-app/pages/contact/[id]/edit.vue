@@ -30,8 +30,8 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const contact = ref<Contact | null>(null);
-      const config = useRuntimeConfig();
-      const domain = config.public.domain;
+    const config = useRuntimeConfig();
+    const domain = config.public.domain;
 
     const fetchContact = async () => {
       try {

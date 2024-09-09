@@ -8,7 +8,7 @@
           <img src="/static/share.png" alt="Share" class="w-6 h-6">
         </a>
       </div>
-      <div class="flex-row content-center items-center mb-4 pt-10 pb-5">
+      <div class="flex flex-col content-center items-center mb-4 pt-10 pb-5">
         <img :src="contact.profile_picture" alt="Profile Picture" class="w-32 h-32 rounded-full profile-picture" @error="handleImageError">
         <h2 class="text-2xl text-white text-center mt-4">{{ contact.name }}</h2>
       </div>

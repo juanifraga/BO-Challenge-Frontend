@@ -2,10 +2,10 @@
     <div class="bg-secondary mx-auto flex flex-col items-center rounded-2xl p-10 w-full">
       <div class="flex items-center mb-6 w-full">
         <div class="relative mr-10">
-          <img :src="contact.profile_picture_url" alt="Profile Picture" class="w-24 h-24 rounded-full profile-picture" />
+          <img :src="contact.profile_picture_url" alt="Profile Picture" class="w-24 h-24 rounded-full profile-picture" @error="handleImageError" />
           <div class="absolute inset-0 w-full h-full rounded-full border-2 border-gray-500"></div>
         </div>
-        <h2 class="ml-4 text-white text-xl">{{ contact.name }}</h2>
+        <h2 class="ml-4 text-white text-xl">{{ originalContactName }}</h2>
       </div>
       <Form @submit="updateContact" class="grid grid-cols-2 gap-6 w-full">
         <div class="form-group flex flex-col mb-6">
@@ -43,90 +43,93 @@
     </div>
   </template>
   
-  <script lang="ts" setup>
-  import { ref } from 'vue';
-  import { useRouter } from 'vue-router';
-  import { Form, Field, ErrorMessage, defineRule, configure } from 'vee-validate';
-  import { required, email } from '@vee-validate/rules';
+  <script>
+  import { defineComponent, ref } from 'vue';
   import { useRuntimeConfig } from '#app';
+  import { useRoute } from 'vue-router';
+  import { Form, Field, ErrorMessage } from 'vee-validate';
+  import * as yup from 'yup';
   
-  
-  defineRule('required', required);
-  defineRule('email', email);
-  
-  
-  configure({
-    generateMessage: (ctx) => {
-      const messages = {
-        required: `${ctx.field} is required`,
-        email: `Please enter a valid email address`,
-      };
-      return messages[ctx.rule.name] ? messages[ctx.rule.name] : `The field ${ctx.field} is invalid`;
+  export default defineComponent({
+    name: 'EditContactView',
+    components: {
+      Form,
+      Field,
+      ErrorMessage
     },
-  });
-  
-  const props = defineProps({
-    contact: {
-      type: Object,
-      required: true
-    }
-  });
-  
-  const contact = ref({ ...props.contact });
-  const profilePicture = ref<File | null>(null);
-  const router = useRouter();
-  const config = useRuntimeConfig();
-  const domain = config.public.domain;
-  
-  const handleFileUpload = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    if (target.files && target.files[0]) {
-      profilePicture.value = target.files[0];
-    }
-  };
-  
-  const updateContact = async (values: any) => {
-    try {
-      const token = localStorage.getItem('token');
-      const formData = new FormData();
-      formData.append('name', values.name);
-      formData.append('address', values.address);
-      formData.append('phone_number', values.phone_number);
-      formData.append('email', values.email);
-      if (profilePicture.value) {
-        formData.append('profile_picture', profilePicture.value);
+    props: {
+      contact: {
+        type: Object,
+        required: true
       }
+    },
+    setup(props) {
+      const contact = ref({ ...props.contact });
+      const originalContactName = ref(props.contact.name);
+      const config = useRuntimeConfig();
+      const domain = config.public.domain;
+      const router = useRouter();
   
-      const response = await fetch(`${domain}/contacts/${contact.value.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
+      const schema = yup.object({
+        name: yup.string().required('Name is required'),
+        address: yup.string().required('Address is required'),
+        phone_number: yup.string().required('Phone number is required'),
+        email: yup.string().email('Invalid email').required('Email is required')
       });
   
-      if (!response.ok) {
-        throw new Error('Failed to update contact');
-      }
+      const updateContact = async (values) => {
+        console.log('Updating contact:', values);
+        try {
+          const response = await fetch(`${domain}/contacts/${contact.value.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(values)
+          });
   
-      const updatedContact = await response.json();
-      console.log('Contact updated successfully:', updatedContact);
-      router.push(`/contact/${contact.value.id}`);
-    } catch (error) {
-      console.error('Error updating contact:', error);
+          if (!response.ok) {
+            throw new Error('Failed to update contact');
+          }
+
+          const responseData = await response.json();
+          console.log('Contact updated successfully:', responseData);
+          router.push(`/contact/${contact.value.id}`);
+        } catch (error) {
+          console.error('Error updating contact:', error);
+        }
+      };
+  
+      const handleFileUpload = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          contact.value.profile_picture_url = URL.createObjectURL(file);
+        }
+      };
+  
+      const handleImageError = (event) => {
+        event.target.src = 'https://umat.edu.gh/staffinfo/staffpix/default-medium(11).png';
+      };
+  
+      return {
+        contact,
+        schema,
+        updateContact,
+        handleFileUpload,
+        handleImageError,
+        originalContactName
+      };
     }
-  };
+  });
   </script>
   
   <style scoped>
-  .form-group {
-    margin-bottom: 1rem;
-  }
-  .text-editInput {
-    color: #000;
-  }
   .profile-picture {
     border: 4px solid #242424; 
     box-shadow: 0 0 0 4px #54FA80;
+  }
+  .text-editInput {
+    color: #99879D;
   }
   </style>
