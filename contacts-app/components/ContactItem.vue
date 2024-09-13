@@ -2,7 +2,7 @@
     <div class="contact-item flex items-center justify-between space-x-4 rounded-2xl bg-secondary">
       <div class="flex items-center space-x-4">
         <img
-            :src="`http://localhost${profilePicture}`" 
+            :src="`${profilePicture}`" 
             alt="Profile Picture" 
             class="h-12 w-12 rounded-full object-cover"
             @error="handleImageError"
