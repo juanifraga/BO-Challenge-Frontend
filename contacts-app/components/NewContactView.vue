@@ -1,12 +1,13 @@
 <template>
     <div class="new-contact-view p-10 bg-secondary rounded-2xl">
       <h1 class="text-2xl text-white mb-6">Add Contact</h1>
-      <Form @submit="createContact" :validation-schema="schema" class="grid grid-cols-2 gap-4 w-full">
+      <Form @submit="handleSubmit" :validation-schema="schema" class="grid grid-cols-2 gap-4 w-full">
         <div class="form-group flex flex-col mb-6">
           <label for="name" class="block text-white">Name</label>
           <Field
             type="text"
             id="name"
+            placeholder="Enter name"
             name="name"
             class="w-full text-xs p-2 rounded"
             v-model="contact.name"
@@ -15,14 +16,15 @@
         </div>
         <div class="form-group flex flex-col mb-6">
           <label for="address" class="block text-white">Address</label>
-          <Field
-            type="text"
+          <vue-google-autocomplete
+            v-if="isGoogleMapsLoaded"
             id="address"
-            name="address"
-            class="w-full text-xs p-2 rounded"
+            classname="w-full text-xs p-2 rounded"
+            placeholder="Enter address"
             v-model="contact.address"
+            @placechanged="getAddressData"
+            :options="autocompleteOptions"
           />
-          <ErrorMessage name="address" class="error" />
         </div>
         <div class="form-group flex flex-col mb-6">
           <label for="profilePicture" class="block text-white">Profile Picture</label>
@@ -31,13 +33,14 @@
             <span>Upload file</span>
             <img src="/static/upload.png" alt="Upload" class="w-4 h-4 ml-2">
           </label>
-          <h3 v-if="profError" class="text-red profError">Profile picture is required</h3>
+          <h3 v-if="profError" class="text-red textError">Profile picture is required</h3>
         </div>
         <div class="form-group flex flex-col mb-6">
           <label for="phoneNumber" class="block text-white">Phone Number</label>
           <Field
             type="text"
             id="phoneNumber"
+            placeholder="Enter phone number"
             name="phoneNumber"
             class="w-full text-xs p-2 rounded"
             v-model="contact.phoneNumber"
@@ -49,6 +52,7 @@
           <Field
             type="email"
             id="email"
+            placeholder="Enter email"
             name="email"
             class="w-full text-xs p-2 rounded"
             v-model="contact.email"
@@ -63,20 +67,20 @@
   </template>
   
   <script>
-  import { defineComponent, ref } from 'vue';
+  import { defineComponent, ref, onMounted } from 'vue';
   import { useRouter } from 'vue-router';
   import { Form, Field, ErrorMessage } from 'vee-validate';
   import * as yup from 'yup';
   import { useRuntimeConfig } from '#app';
-  
- 
+  import VueGoogleAutocomplete from 'vue-google-autocomplete';
   
   export default defineComponent({
     name: 'NewContactView',
     components: {
       Form,
       Field,
-      ErrorMessage
+      ErrorMessage,
+      VueGoogleAutocomplete
     },
     setup() {
       const router = useRouter();
@@ -84,12 +88,39 @@
       const domain = config.public.domain;
       const errorMessage = ref('');
       const profError = ref(false);
+      const isGoogleMapsLoaded = ref(false);
       const contact = ref({
         name: '',
         address: '',
         phoneNumber: '',
         email: '',
         profilePicture: null
+      });
+  
+      const loadGoogleMapsScript = () => {
+        return new Promise((resolve, reject) => {
+          if (typeof google !== 'undefined') {
+            resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${config.public.googleApiKey}&libraries=places`;
+          script.async = true;
+          script.defer = true;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      };
+  
+      onMounted(async () => {
+        try {
+          await loadGoogleMapsScript();
+          isGoogleMapsLoaded.value = true;
+          console.log('Google Maps API script loaded successfully');
+        } catch (error) {
+          console.error('Failed to load Google Maps API script', error);
+        }
       });
   
       const schema = yup.object({
@@ -99,22 +130,26 @@
         email: yup.string().email('Invalid email').required('Email is required'),
       });
   
+      const handleSubmit = (values, { resetForm }) => {
+        console.log("Form submitted", values);
+        createContact(values);
+        resetForm();
+      };
+  
       const createContact = async (values) => {
         try {
+          console.log("Creating contact", values);
           const formData = new FormData();
           formData.append('name', values.name);
-          formData.append('address', values.address);
           formData.append('phone_number', values.phoneNumber);
           formData.append('email', values.email);
+          formData.append('address', values.address);
           if (contact.value.profilePicture) {
-            console.log("entre");
             formData.append('img', contact.value.profilePicture);
-        }else{
-            console.log("entre2");
+          } else {
             profError.value = true;
-          return;
-        }
-          
+            return;
+          }
   
           const response = await fetch(`${domain}/contacts`, {
             method: 'POST',
@@ -143,20 +178,32 @@
       };
   
       const onFileChange = (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        contact.value.profilePicture = file;
-        profError.value = false;
-      }
-    };
+        const file = event.target.files[0];
+        if (file) {
+          contact.value.profilePicture = file;
+          profError.value = false;
+        }
+      };
+  
+      const getAddressData = (addressData) => {
+        contact.value.address = addressData.formatted_address;
+      };
+  
+      const autocompleteOptions = {
+        types: ['address'],
+        componentRestrictions: { country: 'us' }
+      };
   
       return {
         schema,
-        createContact,
+        handleSubmit,
         contact,
         errorMessage,
         onFileChange,
-        profError
+        profError,
+        getAddressData,
+        autocompleteOptions,
+        isGoogleMapsLoaded
       };
     }
   });
@@ -173,7 +220,7 @@
     color: red;
     font-size: 16px;
   }
-  .profError{
+  .textError {
     color: red;
     font-size: 16px;
   }
